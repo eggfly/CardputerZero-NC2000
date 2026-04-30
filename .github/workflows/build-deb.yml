@@ -45,3 +45,33 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: build/nc2000_*_arm64.deb
+
+  prerelease:
+    needs: arm64
+    # Create a prerelease on pushes to main and ci/** branches. PR events
+    # skip this (so forks can't publish), and tag pushes are handled by
+    # the "Attach to release" step above.
+    if: |
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/ci/'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: nc2000-arm64-deb
+          path: artifacts/
+
+      - name: Generate release tag
+        id: tag
+        run: echo "tag=nc2000-$(date +'%Y%m%d-%H%M%S')" >> "$GITHUB_OUTPUT"
+
+      - name: Create prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "NC2000 Prerelease ${{ steps.tag.outputs.tag }}"
+          prerelease: true
+          generate_release_notes: true
+          files: artifacts/*.deb
