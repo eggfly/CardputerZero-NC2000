@@ -51,8 +51,29 @@ extern nc2k_states_t nc2k_states;
 //  evdev keycode → WQX key_id mapping
 //  (same as key.cpp's map_key, but using Linux evdev keycodes)
 // ============================================================
+/* Alt is tracked so we can expose the NC2000 function keys (F5..F12
+ * = 英汉/名片/计算/行程/测验/时间/网络/on-off) as Alt+1..8 on the
+ * CardputerZero keyboard, which has no F-row. Alt on its own keeps
+ * acting as the NC2000 红外 key. */
+static bool alt_down = false;
+
 static uint8_t evdev_to_wqx(int code) {
+    /* --- NC2000 function keys accessed via Alt+<number> ---------- */
+    if (alt_down) {
+        switch (code) {
+            case KEY_1: return 0x0B; // 英汉
+            case KEY_2: return 0x0C; // 名片
+            case KEY_3: return 0x0D; // 计算
+            case KEY_4: return 0x0A; // 行程
+            case KEY_5: return 0x09; // 测验
+            case KEY_6: return 0x08; // 时间
+            case KEY_7: return 0x0E; // 网络
+            case KEY_8: return 0x0F; // on/off
+        }
+    }
+
     switch (code) {
+        /* --- arrows, basic controls --------------------------------- */
         case KEY_RIGHT:      return 0x1F;
         case KEY_LEFT:       return 0x3F;
         case KEY_DOWN:       return 0x1B;
@@ -60,15 +81,21 @@ static uint8_t evdev_to_wqx(int code) {
         case KEY_ENTER:      return 0x1D;
         case KEY_SPACE:      return 0x3E;
         case KEY_DOT:        return 0x3D;
-        case KEY_ESC:        return 0x3B;
+        case KEY_ESC:        return 0x3B; // 跳出
+        case KEY_BACKSPACE:  return 0x3F;
+
+        /* --- punctuation, kept identical to upstream SDL map -------- */
         case KEY_MINUS:      return 0x0E;
         case KEY_EQUAL:      return 0x3E;
-        case KEY_LEFTBRACE:  return 0x38;
-        case KEY_RIGHTBRACE: return 0x39;
-        case KEY_BACKSLASH:  return 0x3A;
+        case KEY_LEFTBRACE:  return 0x38; // 求助
+        case KEY_RIGHTBRACE: return 0x39; // 中英数
+        case KEY_BACKSLASH:  return 0x3A; // 输入法
         case KEY_COMMA:      return 0x37;
         case KEY_SLASH:      return 0x1E;
-        case KEY_BACKSPACE:  return 0x3F;
+        case KEY_SEMICOLON:  return 0x15; // 发音
+        case KEY_APOSTROPHE: return 0x14; // 报时
+
+        /* --- digits ------------------------------------------------- */
         case KEY_0:          return 0x3C;
         case KEY_1:          return 0x34;
         case KEY_2:          return 0x35;
@@ -79,6 +106,8 @@ static uint8_t evdev_to_wqx(int code) {
         case KEY_7:          return 0x24;
         case KEY_8:          return 0x25;
         case KEY_9:          return 0x26;
+
+        /* --- letters ------------------------------------------------ */
         case KEY_A:          return 0x28;
         case KEY_B:          return 0x34;
         case KEY_C:          return 0x32;
@@ -105,17 +134,22 @@ static uint8_t evdev_to_wqx(int code) {
         case KEY_X:          return 0x31;
         case KEY_Y:          return 0x25;
         case KEY_Z:          return 0x30;
-        case KEY_F5:         return 0x0B; // 英汉
-        case KEY_F6:         return 0x0C; // 名片
-        case KEY_F7:         return 0x0D; // 计算
-        case KEY_F8:         return 0x0A; // 行程
-        case KEY_F9:         return 0x09; // 测验
-        case KEY_F10:        return 0x08; // 时间
-        case KEY_F11:        return 0x0E; // 网络
-        case KEY_F12:        return 0x0F; // on/off
-        case KEY_SEMICOLON:  return 0x15; // 发音
-        case KEY_APOSTROPHE: return 0x14; // 报时
-        case KEY_TAB:        return 0xFF; // special: fast-forward toggle
+
+        /* --- F-row fallbacks (if a real keyboard is ever used) ------ */
+        case KEY_F5:         return 0x0B;
+        case KEY_F6:         return 0x0C;
+        case KEY_F7:         return 0x0D;
+        case KEY_F8:         return 0x0A;
+        case KEY_F9:         return 0x09;
+        case KEY_F10:        return 0x08;
+        case KEY_F11:        return 0x0E;
+        case KEY_F12:        return 0x0F;
+
+        /* --- Alt (红外, key_id 0x01) — also the modifier for F5..F12 */
+        case KEY_LEFTALT:
+        case KEY_RIGHTALT:   return 0x01; // 红外  (see comment at top)
+
+        case KEY_TAB:        return 0xFF; // fast-forward toggle
         default:             return 0xFF;
     }
 }
@@ -177,10 +211,17 @@ static void *evdev_thread(void *arg) {
         }
         bool down = (ev.value == 1);
         if (!yx_map_inited) init_yx_map();
-        printf("[NC2K-EVDEV] code=%u value=%d(%s)\n",
-               ev.code, ev.value, down ? "DOWN" : (ev.value == 0 ? "UP" : "REPEAT"));
+        printf("[NC2K-EVDEV] code=%u value=%d(%s)%s\n",
+               ev.code, ev.value,
+               down ? "DOWN" : (ev.value == 0 ? "UP" : "REPEAT"),
+               alt_down ? " [alt held]" : "");
         fflush(stdout);
         if (ev.value > 1) continue; // ignore repeat
+
+        /* Track Alt state first so evdev_to_wqx sees it. */
+        if (ev.code == KEY_LEFTALT || ev.code == KEY_RIGHTALT) {
+            alt_down = down;
+        }
         uint8_t wqx_key = evdev_to_wqx(ev.code);
         if (wqx_key == 0xFF) {
             if (ev.code == KEY_TAB && down) {
