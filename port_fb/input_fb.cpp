@@ -223,17 +223,11 @@ static void *evdev_thread(void *arg) {
         }
         bool down = (ev.value == 1);
         if (!yx_map_inited) init_yx_map();
-        printf("[NC2K-EVDEV] code=%u value=%d(%s)%s\n",
+        printf("[NC2K-EVDEV] code=%u value=%d(%s)\n",
                ev.code, ev.value,
-               down ? "DOWN" : (ev.value == 0 ? "UP" : "REPEAT"),
-               alt_down ? " [alt held]" : "");
+               down ? "DOWN" : (ev.value == 0 ? "UP" : "REPEAT"));
         fflush(stdout);
         if (ev.value > 1) continue; // ignore repeat
-
-        /* Track Alt state first so evdev_to_wqx sees it. */
-        if (ev.code == KEY_LEFTALT || ev.code == KEY_RIGHTALT) {
-            alt_down = down;
-        }
         uint8_t wqx_key = evdev_to_wqx(ev.code);
         if (wqx_key == 0xFF) {
             if (ev.code == KEY_TAB && down) {
