@@ -13,6 +13,7 @@
 // From display_fb.cpp
 bool display_fb_init();
 void display_fb_shutdown();
+bool display_fb_show_splash(const char *path);
 
 // From input_fb.cpp
 void input_fb_init(bool enable_evdev, bool enable_stdin, bool enable_tcp, int port);
@@ -80,6 +81,16 @@ int main(int argc, char *argv[]) {
     if (!display_fb_init()) {
         fprintf(stderr, "Failed to init framebuffer display\n");
         return 1;
+    }
+
+    /* Show the CardputerZero keymap splash for a couple seconds
+     * before the emulator overwrites the screen. Path mirrors the
+     * deb install layout; falls through silently in dev builds. */
+    const char *splash_env = getenv("NC2000_SPLASH");
+    const char *splash_path = splash_env ? splash_env
+                                         : "/usr/share/nc2000/splash.rgb565";
+    if (display_fb_show_splash(splash_path)) {
+        sleep(2);
     }
 
     // Enable all input paths: evdev (physical kb) + TCP (remote)

@@ -75,6 +75,45 @@ bool display_fb_init() {
     return true;
 }
 
+/* Blit a 320x170 raw RGB565 splash (little-endian) from a file to
+ * fb0. Returns false if the file can't be opened / is wrong size;
+ * caller should then fall through to emulator output. */
+bool display_fb_show_splash(const char *path) {
+    if (!fb_mem) return false;
+    FILE *fp = fopen(path, "rb");
+    if (!fp) {
+        printf("[splash] cannot open %s\n", path);
+        return false;
+    }
+    const int SPW = 320;
+    const int SPH = 170;
+    fseek(fp, 0, SEEK_END);
+    long sz = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    if (sz != (long)(SPW * SPH * 2)) {
+        printf("[splash] %s wrong size %ld (expected %d)\n", path, sz, SPW*SPH*2);
+        fclose(fp);
+        return false;
+    }
+    // Read row by row and blit into fb, centered (or clipped to fb size)
+    int off_x = (fb_width  - SPW) / 2;  if (off_x < 0) off_x = 0;
+    int off_y = (fb_height - SPH) / 2;  if (off_y < 0) off_y = 0;
+    int copy_w = SPW;  if (off_x + copy_w > fb_width)  copy_w = fb_width  - off_x;
+    int copy_h = SPH;  if (off_y + copy_h > fb_height) copy_h = fb_height - off_y;
+
+    uint16_t row[SPW];
+    for (int y = 0; y < SPH; ++y) {
+        size_t got = fread(row, 2, SPW, fp);
+        if ((int)got != SPW) break;
+        if (y >= copy_h) continue;
+        uint16_t *dst = fb_mem + ((off_y + y) * (fb_stride / 2)) + off_x;
+        memcpy(dst, row, copy_w * 2);
+    }
+    fclose(fp);
+    printf("[splash] drew %s\n", path);
+    return true;
+}
+
 void display_fb_shutdown() {
     if (fb_mem && fb_mem != MAP_FAILED) {
         munmap(fb_mem, fb_stride * fb_height);
