@@ -110,6 +110,18 @@ void main_loop() {
       } else if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
         key_pressed = true;
         bool key_down = (event.type == SDL_KEYDOWN);
+        /* CardputerZero debug: dump every raw SDL key event so we can see
+         * whether Y/N ever reaches the emulator, and which path (legacy
+         * handle_key vs handle_key_wayback) consumes it. */
+        const char *kname = SDL_GetKeyName(event.key.keysym.sym);
+        printf("[NC2K-KEY] %s sym=0x%x(%d) scancode=%d name='%s' mod=0x%x shift=%d ctrl=%d\n",
+               key_down ? "DOWN" : "UP",
+               (unsigned)event.key.keysym.sym, (int)event.key.keysym.sym,
+               (int)event.key.keysym.scancode,
+               kname ? kname : "?",
+               (unsigned)event.key.keysym.mod,
+               shift_down, ctrl_down);
+        fflush(stdout);
         //try to consolidate multiple key shoot into one
         //not sure if necessary. But it's helpful for debug
         mp[event.key.keysym.sym]= key_down;
@@ -125,12 +137,21 @@ void main_loop() {
           bool console_on_saved=console_on;
           handle_console(it->first, it->second);// handles 1. console toggle 2. console itself
           if(console_on_saved){
+            printf("[NC2K-KEY] -> consumed by console\n");
+            fflush(stdout);
             continue;
           }
+          printf("[NC2K-KEY] -> %s(sym=0x%x, down=%d)\n",
+                 use_legacy_key_io ? "handle_key" : "handle_key_wayback",
+                 (unsigned)it->first, it->second);
+          fflush(stdout);
           if(use_legacy_key_io) handle_key(it->first, it->second);
           else handle_key_wayback(it->first,it->second);
         }
       } else if (event.type == SDL_TEXTINPUT) {
+        printf("[NC2K-KEY] TEXTINPUT text='%s' (first byte=0x%02x)\n",
+               event.text.text, (unsigned char)event.text.text[0]);
+        fflush(stdout);
         input_text(event.text.text);
       }
     }
