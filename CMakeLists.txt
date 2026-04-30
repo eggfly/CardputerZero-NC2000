@@ -126,3 +126,25 @@ install(FILES cardputer/nc2000.desktop
         DESTINATION share/APPLaunch/applications)
 install(FILES packaging/nc2000_icon.png
         DESTINATION share/APPLaunch/share/images)
+
+# --- CardputerZero startup splash (320x170 keymap cheatsheet) -------
+# Generated at configure time by packaging/gen_splash.py into
+# ${CMAKE_CURRENT_BINARY_DIR}/splash.rgb565 (raw RGB565, little endian).
+# Python3 + Pillow required on the build host; CI already has both.
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_FOUND)
+    set(SPLASH_OUT_PNG ${CMAKE_CURRENT_BINARY_DIR}/splash.png)
+    set(SPLASH_OUT_RAW ${CMAKE_CURRENT_BINARY_DIR}/splash.rgb565)
+    add_custom_command(
+        OUTPUT ${SPLASH_OUT_PNG} ${SPLASH_OUT_RAW}
+        COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/packaging/gen_splash.py
+                ${SPLASH_OUT_PNG}
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/packaging/gen_splash.py
+        COMMENT "Generating CardputerZero startup splash"
+    )
+    add_custom_target(nc2000_splash ALL DEPENDS ${SPLASH_OUT_RAW})
+    install(FILES ${SPLASH_OUT_RAW} DESTINATION share/nc2000)
+else()
+    message(WARNING "python3 not found; skipping splash.rgb565 generation")
+endif()
