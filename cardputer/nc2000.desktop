@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=NC2000
+Exec=sh -c "/usr/share/nc2000/nc2000-launch.sh"
+Icon=share/images/nc2000_icon.png
+Terminal=false
+Sysplause=false
+Type=Application
