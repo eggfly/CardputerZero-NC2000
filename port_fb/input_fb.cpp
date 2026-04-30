@@ -138,14 +138,19 @@ static int find_keyboard_evdev() {
         if (fd < 0) continue;
         char name[256] = "";
         ioctl(fd, EVIOCGNAME(sizeof(name)), name);
+        printf("[NC2K-EVDEV] scan %s name='%s'\n", path, name);
+        fflush(stdout);
         if (strstr(name, "tca8418")) {
-            printf("evdev: found tca8418 keyboard at %s\n", path);
+            printf("[NC2K-EVDEV] -> picked %s (name='%s')\n", path, name);
+            fflush(stdout);
             closedir(dir);
             return fd;
         }
         close(fd);
     }
     closedir(dir);
+    printf("[NC2K-EVDEV] no tca8418 device found!\n");
+    fflush(stdout);
     return -1;
 }
 
@@ -162,24 +167,36 @@ static void *evdev_thread(void *arg) {
             }
             break;
         }
-        if (ev.type != EV_KEY) continue;
-        if (ev.value > 1) continue; // ignore repeat
-
+        if (ev.type != EV_KEY) {
+            /* Log syn/misc too so we can tell whether the fd is
+             * receiving events at all. */
+            if (ev.type != EV_SYN)
+                printf("[NC2K-EVDEV] non-KEY event type=%u code=%u value=%d\n",
+                       ev.type, ev.code, ev.value);
+            continue;
+        }
         bool down = (ev.value == 1);
         if (!yx_map_inited) init_yx_map();
-        fprintf(stderr, "evdev: code=%d %s\n", ev.code, down ? "DOWN" : "UP");
+        printf("[NC2K-EVDEV] code=%u value=%d(%s)\n",
+               ev.code, ev.value, down ? "DOWN" : (ev.value == 0 ? "UP" : "REPEAT"));
+        fflush(stdout);
+        if (ev.value > 1) continue; // ignore repeat
         uint8_t wqx_key = evdev_to_wqx(ev.code);
         if (wqx_key == 0xFF) {
             if (ev.code == KEY_TAB && down) {
                 fast_forward ^= 1;
             }
+            printf("[NC2K-EVDEV]   -> no wqx mapping\n");
+            fflush(stdout);
             continue;
         }
         if (wqx_key < 0x40 && key_id_to_yx[wqx_key].y >= 0) {
             int y = key_id_to_yx[wqx_key].y;
             int x = key_id_to_yx[wqx_key].x;
             keypadmatrix[y][x] = down ? 1 : 0;
-            fprintf(stderr, "evdev: code=%d -> wqx=0x%02x -> matrix[%d][%d]=%d\n", ev.code, wqx_key, y, x, down?1:0);
+            printf("[NC2K-EVDEV]   -> wqx=0x%02x matrix[%d][%d]=%d\n",
+                   wqx_key, y, x, down ? 1 : 0);
+            fflush(stdout);
         }
     }
     return NULL;
