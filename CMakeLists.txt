@@ -10,8 +10,10 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -g -pthread -DHANDYPSP -Wno-deprecat
 find_package(SDL2 REQUIRED)
 message(STATUS "sdl includes: ${SDL2_INCLUDE_DIRS}")
 message(STATUS "sdl libs:     ${SDL2_LIBRARIES}")
-include_directories(${SDL2_INCLUDE_DIRS})
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+
+# All upstream NC2000 headers live under src/.
+set(NC2K_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
+include_directories(${SDL2_INCLUDE_DIRS} ${NC2K_SRC_DIR})
 
 if(ENABLE_SERIAL_PORT)
     message(STATUS "serial port support enabled!")
@@ -27,42 +29,47 @@ if(ENABLE_UDP_SERVER)
     add_definitions(-DENABLE_UDP_SERVER)
 endif()
 
-set(NC2K_SRC
-    main.cpp
-    nc2000.cpp
-    disassembler.cpp
-    disassembler_new.cpp
-    cpu.cpp
-    cpu_loop.cpp
-    cpu_loop_new.cpp
-    comm.cpp
-    mem.cpp
-    io.cpp
-    io_new.cpp
-    rom.cpp
-    nor.cpp
-    nand.cpp
-    ram.cpp
-    dsp/dsp.cpp
-    sound.cpp
-    cmd.cpp
-    udp_server.cpp
-    ansi/w65c02cpu.cpp
-    ansi/w65c02op.cpp
-    NekoDriverIO.cpp
-    key.cpp
-    key_new.cpp
-    compare/c6502.cpp
-    compare/pc1000bus.cpp
-    settings.cpp
-    display.cpp
-    console.cpp
-    iv_uart.cpp
-    lcdstripe/json.cpp
-    lcdstripe/lcdpainter.cpp
+# Core emulation sources (shared by the SDL and framebuffer targets).
+set(NC2K_CORE
+    ${NC2K_SRC_DIR}/nc2000.cpp
+    ${NC2K_SRC_DIR}/cpu.cpp
+    ${NC2K_SRC_DIR}/cpu_loop.cpp
+    ${NC2K_SRC_DIR}/cpu_loop_new.cpp
+    ${NC2K_SRC_DIR}/mem.cpp
+    ${NC2K_SRC_DIR}/io.cpp
+    ${NC2K_SRC_DIR}/io_new.cpp
+    ${NC2K_SRC_DIR}/rom.cpp
+    ${NC2K_SRC_DIR}/nor.cpp
+    ${NC2K_SRC_DIR}/nand.cpp
+    ${NC2K_SRC_DIR}/ram.cpp
+    ${NC2K_SRC_DIR}/comm.cpp
+    ${NC2K_SRC_DIR}/cmd.cpp
+    ${NC2K_SRC_DIR}/settings.cpp
+    ${NC2K_SRC_DIR}/NekoDriverIO.cpp
+    ${NC2K_SRC_DIR}/disassembler.cpp
+    ${NC2K_SRC_DIR}/disassembler_new.cpp
+    ${NC2K_SRC_DIR}/iv_uart.cpp
+    ${NC2K_SRC_DIR}/udp_server.cpp
+    ${NC2K_SRC_DIR}/dsp/dsp.cpp
+    ${NC2K_SRC_DIR}/ansi/w65c02cpu.cpp
+    ${NC2K_SRC_DIR}/ansi/w65c02op.cpp
+    ${NC2K_SRC_DIR}/compare/c6502.cpp
+    ${NC2K_SRC_DIR}/compare/pc1000bus.cpp
+    ${NC2K_SRC_DIR}/lcdstripe/json.cpp
+    ${NC2K_SRC_DIR}/key.cpp
 )
 
-add_executable(nc2000 ${NC2K_SRC})
+# SDL target sources on top of the core.
+set(NC2K_SDL_ONLY
+    ${NC2K_SRC_DIR}/main.cpp
+    ${NC2K_SRC_DIR}/sound.cpp
+    ${NC2K_SRC_DIR}/display.cpp
+    ${NC2K_SRC_DIR}/console.cpp
+    ${NC2K_SRC_DIR}/key_new.cpp
+    ${NC2K_SRC_DIR}/lcdstripe/lcdpainter.cpp
+)
+
+add_executable(nc2000 ${NC2K_CORE} ${NC2K_SDL_ONLY})
 target_link_libraries(nc2000 PRIVATE ${SDL2_LIBRARIES})
 
 if(ENABLE_UDP_SERVER AND WIN32)
@@ -82,48 +89,20 @@ endif()
 # that KMSDRM can't reach. Linux-only.
 # ============================================================
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-set(NC2K_FB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/port_fb)
-set(NC2K_FB_CORE
-    nc2000.cpp
-    cpu.cpp
-    cpu_loop.cpp
-    cpu_loop_new.cpp
-    mem.cpp
-    io.cpp
-    io_new.cpp
-    rom.cpp
-    nor.cpp
-    nand.cpp
-    ram.cpp
-    comm.cpp
-    cmd.cpp
-    settings.cpp
-    NekoDriverIO.cpp
-    disassembler.cpp
-    disassembler_new.cpp
-    iv_uart.cpp
-    udp_server.cpp
-    dsp/dsp.cpp
-    ansi/w65c02cpu.cpp
-    ansi/w65c02op.cpp
-    compare/c6502.cpp
-    compare/pc1000bus.cpp
-    lcdstripe/json.cpp
-    key.cpp
-)
-set(NC2K_FB_PORT
-    ${NC2K_FB_DIR}/main_fb.cpp
-    ${NC2K_FB_DIR}/display_fb.cpp
-    ${NC2K_FB_DIR}/sound_stub.cpp
-    ${NC2K_FB_DIR}/input_fb.cpp
-    ${NC2K_FB_DIR}/console_stub.cpp
-    ${NC2K_FB_DIR}/lcdpainter_stub.cpp
-)
-add_executable(nc2000_fb ${NC2K_FB_CORE} ${NC2K_FB_PORT})
-# Stub SDL.h / lcdpainter.h live in port_fb/ and must come before the
-# real headers sitting at the repo root.
-target_include_directories(nc2000_fb BEFORE PRIVATE ${NC2K_FB_DIR})
-target_link_libraries(nc2000_fb PRIVATE pthread)
+    set(NC2K_FB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/port_fb)
+    set(NC2K_FB_PORT
+        ${NC2K_FB_DIR}/main_fb.cpp
+        ${NC2K_FB_DIR}/display_fb.cpp
+        ${NC2K_FB_DIR}/sound_stub.cpp
+        ${NC2K_FB_DIR}/input_fb.cpp
+        ${NC2K_FB_DIR}/console_stub.cpp
+        ${NC2K_FB_DIR}/lcdpainter_stub.cpp
+    )
+    add_executable(nc2000_fb ${NC2K_CORE} ${NC2K_FB_PORT})
+    # Stub SDL.h / lcdpainter.h live in port_fb/ and must come before
+    # the real headers sitting under src/.
+    target_include_directories(nc2000_fb BEFORE PRIVATE ${NC2K_FB_DIR})
+    target_link_libraries(nc2000_fb PRIVATE pthread)
 endif()
 
 # --- install rules: used by packaging/build_deb.sh -----------------
@@ -139,7 +118,7 @@ endif()
 if(TARGET nc2000_fb)
     install(TARGETS nc2000_fb RUNTIME DESTINATION share/nc2000)
 endif()
-install(FILES wqxhex.bin DESTINATION share/nc2000)
+install(FILES ${NC2K_SRC_DIR}/wqxhex.bin DESTINATION share/nc2000)
 install(DIRECTORY resource DESTINATION share/nc2000)
 install(DIRECTORY roms     DESTINATION share/nc2000)
 install(PROGRAMS cardputer/nc2000-launch.sh DESTINATION share/nc2000)
