@@ -128,15 +128,17 @@ endif()
 
 # --- install rules: used by packaging/build_deb.sh -----------------
 # Layout inside the resulting .deb:
-#   /usr/share/nc2000/{nc2000, nc2000_fb, nc2000-launch.sh, wqxhex.bin,
+#   /usr/share/nc2000/{nc2000_fb, nc2000-launch.sh, wqxhex.bin,
 #                      resource/, roms/}
 #   /usr/share/APPLaunch/applications/nc2000.desktop
 #   /usr/share/APPLaunch/share/images/nc2000_icon.png
-set(INSTALL_TARGETS nc2000)
+#
+# Only the framebuffer binary goes into the .deb — the SDL variant is
+# kept as a build target for dev machines (macOS/Linux desktops) but
+# isn't useful on CardputerZero.
 if(TARGET nc2000_fb)
-    list(APPEND INSTALL_TARGETS nc2000_fb)
+    install(TARGETS nc2000_fb RUNTIME DESTINATION share/nc2000)
 endif()
-install(TARGETS ${INSTALL_TARGETS} RUNTIME DESTINATION share/nc2000)
 install(FILES wqxhex.bin DESTINATION share/nc2000)
 install(DIRECTORY resource DESTINATION share/nc2000)
 install(DIRECTORY roms     DESTINATION share/nc2000)
