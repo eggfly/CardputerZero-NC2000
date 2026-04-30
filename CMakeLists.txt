@@ -74,12 +74,69 @@ if(ENABLE_SERIAL_PORT)
     target_link_libraries(nc2000 PRIVATE ${LIBSERIALPORT_LIBRARIES})
 endif()
 
+# ============================================================
+# nc2000_fb — framebuffer port (no SDL, renders /dev/fb0 directly,
+# reads /dev/input/event* via evdev). This is the variant that
+# actually works on CardputerZero since libsdl2 2.32 on Debian
+# trixie has no fbcon/fbdev backend and the LCD is a fbtft device
+# that KMSDRM can't reach. Linux-only.
+# ============================================================
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+set(NC2K_FB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/port_fb)
+set(NC2K_FB_CORE
+    nc2000.cpp
+    cpu.cpp
+    cpu_loop.cpp
+    cpu_loop_new.cpp
+    mem.cpp
+    io.cpp
+    io_new.cpp
+    rom.cpp
+    nor.cpp
+    nand.cpp
+    ram.cpp
+    comm.cpp
+    cmd.cpp
+    settings.cpp
+    NekoDriverIO.cpp
+    disassembler.cpp
+    disassembler_new.cpp
+    iv_uart.cpp
+    udp_server.cpp
+    dsp/dsp.cpp
+    ansi/w65c02cpu.cpp
+    ansi/w65c02op.cpp
+    compare/c6502.cpp
+    compare/pc1000bus.cpp
+    lcdstripe/json.cpp
+    key.cpp
+)
+set(NC2K_FB_PORT
+    ${NC2K_FB_DIR}/main_fb.cpp
+    ${NC2K_FB_DIR}/display_fb.cpp
+    ${NC2K_FB_DIR}/sound_stub.cpp
+    ${NC2K_FB_DIR}/input_fb.cpp
+    ${NC2K_FB_DIR}/console_stub.cpp
+    ${NC2K_FB_DIR}/lcdpainter_stub.cpp
+)
+add_executable(nc2000_fb ${NC2K_FB_CORE} ${NC2K_FB_PORT})
+# Stub SDL.h / lcdpainter.h live in port_fb/ and must come before the
+# real headers sitting at the repo root.
+target_include_directories(nc2000_fb BEFORE PRIVATE ${NC2K_FB_DIR})
+target_link_libraries(nc2000_fb PRIVATE pthread)
+endif()
+
 # --- install rules: used by packaging/build_deb.sh -----------------
 # Layout inside the resulting .deb:
-#   /usr/share/nc2000/{nc2000, nc2000-launch.sh, wqxhex.bin, resource/, roms/}
+#   /usr/share/nc2000/{nc2000, nc2000_fb, nc2000-launch.sh, wqxhex.bin,
+#                      resource/, roms/}
 #   /usr/share/APPLaunch/applications/nc2000.desktop
 #   /usr/share/APPLaunch/share/images/nc2000_icon.png
-install(TARGETS nc2000 RUNTIME DESTINATION share/nc2000)
+set(INSTALL_TARGETS nc2000)
+if(TARGET nc2000_fb)
+    list(APPEND INSTALL_TARGETS nc2000_fb)
+endif()
+install(TARGETS ${INSTALL_TARGETS} RUNTIME DESTINATION share/nc2000)
 install(FILES wqxhex.bin DESTINATION share/nc2000)
 install(DIRECTORY resource DESTINATION share/nc2000)
 install(DIRECTORY roms     DESTINATION share/nc2000)
