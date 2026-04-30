@@ -60,6 +60,20 @@ int main(int argc, char *argv[]) {
 
     printf("=== WQX Emulator (Framebuffer Port) ===\n");
     printf("Mode: %s\n", nc2000mode ? "NC2000" : (nc1020mode ? "NC1020" : "unknown"));
+    /* CardputerZero 键位速查 (journalctl 里可见；启动画面在 TODO) */
+    printf(
+        "\n=== CardputerZero 键位 (与真机 F 行对应) ===\n"
+        "  Sym+1  英汉        Sym+5  测验\n"
+        "  Sym+2  名片        Sym+6  时间\n"
+        "  Sym+3  计算        Sym+7  网络\n"
+        "  Sym+4  行程        Sym+8  on/off\n"
+        "  Alt    红外        ESC    跳出\n"
+        "  长按 ESC 3s        返回 APPLauncher 主界面\n"
+        "  ;      发音        '      报时\n"
+        "  [ ] \\  求助/中英数/输入法\n"
+        "  TAB    快进        方向/Enter/BS/Space/字母/数字  直接按\n"
+        "============================================\n\n");
+    fflush(stdout);
 
     LoadNC2k();
 

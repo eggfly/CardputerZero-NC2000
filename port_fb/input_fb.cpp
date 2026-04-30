@@ -51,28 +51,30 @@ extern nc2k_states_t nc2k_states;
 //  evdev keycode → WQX key_id mapping
 //  (same as key.cpp's map_key, but using Linux evdev keycodes)
 // ============================================================
-/* Alt is tracked so we can expose the NC2000 function keys (F5..F12
- * = 英汉/名片/计算/行程/测验/时间/网络/on-off) as Alt+1..8 on the
- * CardputerZero keyboard, which has no F-row. Alt on its own keeps
- * acting as the NC2000 红外 key. */
-static bool alt_down = false;
-
+/* CardputerZero has no F-row, but its tca8418 driver's Sym layer
+ * already remaps Sym+<N> to distinct evdev codes in the 183..233
+ * range (see tca8418_keypad_m5stack_keymap.map). So we can just map
+ * those codes directly — no modifier tracking needed. */
 static uint8_t evdev_to_wqx(int code) {
-    /* --- NC2000 function keys accessed via Alt+<number> ---------- */
-    if (alt_down) {
-        switch (code) {
-            case KEY_1: return 0x0B; // 英汉
-            case KEY_2: return 0x0C; // 名片
-            case KEY_3: return 0x0D; // 计算
-            case KEY_4: return 0x0A; // 行程
-            case KEY_5: return 0x09; // 测验
-            case KEY_6: return 0x08; // 时间
-            case KEY_7: return 0x0E; // 网络
-            case KEY_8: return 0x0F; // on/off
-        }
-    }
-
     switch (code) {
+        /* --- Sym layer: NC2000 function keys (Sym+1..8) ------------- */
+        /* Sym+1 -> "!" (code 183) -> 英汉 */
+        /* Sym+2 -> "@" (code 184) -> 名片 */
+        /* Sym+3 -> "#" (code 185) -> 计算 */
+        /* Sym+4 -> "$" (code 186) -> 行程 */
+        /* Sym+5 -> "%" (code 187) -> 测验 */
+        /* Sym+6 -> "^" (code 188) -> 时间 */
+        /* Sym+7 -> "&" (code 189) -> 网络 */
+        /* Sym+8 -> "*" (code 190) -> on/off */
+        case 183:            return 0x0B;
+        case 184:            return 0x0C;
+        case 185:            return 0x0D;
+        case 186:            return 0x0A;
+        case 187:            return 0x09;
+        case 188:            return 0x08;
+        case 189:            return 0x0E;
+        case 190:            return 0x0F;
+
         /* --- arrows, basic controls --------------------------------- */
         case KEY_RIGHT:      return 0x1F;
         case KEY_LEFT:       return 0x3F;
@@ -94,6 +96,16 @@ static uint8_t evdev_to_wqx(int code) {
         case KEY_SLASH:      return 0x1E;
         case KEY_SEMICOLON:  return 0x15; // 发音
         case KEY_APOSTROPHE: return 0x14; // 报时
+
+        /* --- Sym layer punctuation aliases (tca8418 keymap) --------- */
+        /* Sym+[ -> "{"=199 -> same as LEFTBRACE (求助) */
+        /* Sym+] -> "}"=200 -> same as RIGHTBRACE (中英数) */
+        /* Sym+\ -> "|"=233 -> same as BACKSLASH (输入法)  */
+        case 199:            return 0x38; // 求助
+        case 200:            return 0x39; // 中英数
+        case 233:            return 0x3A; // 输入法
+        case 211:            return 0x15; // Sym+. -> ";" -> 发音
+        case 216:            return 0x14; // Sym+, -> "'" -> 报时
 
         /* --- digits ------------------------------------------------- */
         case KEY_0:          return 0x3C;

@@ -70,27 +70,31 @@ cmake --build build -j
 
 ## CardputerZero 键位
 
-CardputerZero 没有 F 行，所以 NC2000 的**一排功能键改用 Alt+数字**。其它键基本跟真机/上游一致：
+CardputerZero 没有 F 行，所以 NC2000 一排功能键**用 Sym + 数字**（Sym 键加对应位置的符号，物理上就是 `! @ # $ % ^ & *`）：
 
-| NC2000 功能 | 真机按键 | CardputerZero |
+| NC2000 功能 | 真机 | CardputerZero |
 |---|---|---|
-| 英汉 | F5 | **Alt + 1** |
-| 名片 | F6 | **Alt + 2** |
-| 计算 | F7 | **Alt + 3** |
-| 行程 | F8 | **Alt + 4** |
-| 测验 | F9 | **Alt + 5** |
-| 时间 | F10 | **Alt + 6** |
-| 网络 | F11 | **Alt + 7** |
-| on/off | F12 | **Alt + 8** |
-| 红外 | Alt | `Alt`（单独按下松开） |
-| 发音 | `;` | `Fn + …`（按 `;`）|
-| 报时 | `'` | `'` |
-| 求助 / 中英数 / 输入法 | `[` / `]` / `\` | 同键（Fn 组合） |
+| 英汉 | F5 | **Sym + 1** |
+| 名片 | F6 | **Sym + 2** |
+| 计算 | F7 | **Sym + 3** |
+| 行程 | F8 | **Sym + 4** |
+| 测验 | F9 | **Sym + 5** |
+| 时间 | F10 | **Sym + 6** |
+| 网络 | F11 | **Sym + 7** |
+| on/off | F12 | **Sym + 8** |
+| 红外 | Alt | `Alt` |
+| 发音 | `;` | `;`（Sym + `.` 也行）|
+| 报时 | `'` | `'`（Sym + `,` 也行） |
+| 求助 | `[` | `[` |
+| 中英数 | `]` | `]` |
+| 输入法 | `\` | `\` |
 | 跳出 | ESC | `ESC` |
-| 跳出回 launcher | — | **长按 `ESC` ≥ 3 秒** |
+| 返回 APPLauncher | — | **长按 `ESC` ≥ 3 秒** |
 | 翻页上 / 下 | `,` / `?` | 同键 |
-| 快进 | `TAB` | `TAB` |
+| 快进 | TAB | TAB |
 | 方向、Enter、Backspace、Space、字母、数字 | 同 | 直接按 |
+
+启动时 journal 也会打印这张表（`journalctl -u APPLaunch.service | grep 键位`）。
 
 完整真机键位见 [上游 Wiki](https://github.com/wangyu-/NC2000/wiki/%E6%A8%A1%E6%8B%9F%E5%99%A8%E9%94%AE%E4%BD%8D)。
 
