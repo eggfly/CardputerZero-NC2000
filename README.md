@@ -70,22 +70,29 @@ cmake --build build -j
 
 ## CardputerZero 键位
 
-CardputerZero 键盘已映射为标准 SDL keycode，上游键位基本直接可用。常用：
+CardputerZero 没有 F 行，所以 NC2000 的**一排功能键改用 Alt+数字**。其它键基本跟真机/上游一致：
 
-| 功能 | NC 按键 | CardputerZero |
+| NC2000 功能 | 真机按键 | CardputerZero |
 |---|---|---|
-| 英汉 / 名片 / 计算 / 行程 / 测验 / 时间 / 网络 | F5–F11 | `F5`–`F11`（`Fn + 1..7`） |
-| on/off | F12 | `F12`（`Fn + 8`） |
-| 发音 | `;` | `;` |
+| 英汉 | F5 | **Alt + 1** |
+| 名片 | F6 | **Alt + 2** |
+| 计算 | F7 | **Alt + 3** |
+| 行程 | F8 | **Alt + 4** |
+| 测验 | F9 | **Alt + 5** |
+| 时间 | F10 | **Alt + 6** |
+| 网络 | F11 | **Alt + 7** |
+| on/off | F12 | **Alt + 8** |
+| 红外 | Alt | `Alt`（单独按下松开） |
+| 发音 | `;` | `Fn + …`（按 `;`）|
 | 报时 | `'` | `'` |
-| 求助 / 中英数 / 输入法 | `[` / `]` / `\` | 同键 |
-| 红外 | Alt | `Alt` |
-| 跳出 | Esc | `ESC` |
+| 求助 / 中英数 / 输入法 | `[` / `]` / `\` | 同键（Fn 组合） |
+| 跳出 | ESC | `ESC` |
+| 跳出回 launcher | — | **长按 `ESC` ≥ 3 秒** |
 | 翻页上 / 下 | `,` / `?` | 同键 |
 | 快进 | `TAB` | `TAB` |
-| 内置命令行 | `` ` `` | `` ` `` |
+| 方向、Enter、Backspace、Space、字母、数字 | 同 | 直接按 |
 
-完整键位见 [上游 Wiki](https://github.com/wangyu-/NC2000/wiki/%E6%A8%A1%E6%8B%9F%E5%99%A8%E9%94%AE%E4%BD%8D)。
+完整真机键位见 [上游 Wiki](https://github.com/wangyu-/NC2000/wiki/%E6%A8%A1%E6%8B%9F%E5%99%A8%E9%94%AE%E4%BD%8D)。
 
 ## 屏幕适配
 
@@ -120,6 +127,11 @@ CardputerZero-NC2000/
 └── .github/workflows/
     └── build-deb.yml      # arm64 CI
 ```
+
+## 相关项目
+
+- [wangyu-/NC2000](https://github.com/wangyu-/NC2000) — 上游模拟器（本仓库 fork 源）
+- [NC2000-wasm](https://fwindpeak.github.io/NC2000-wasm/build/index.html) — 同一模拟器的浏览器 WebAssembly 构建，电脑/手机都能开
 
 ## Credits
 
