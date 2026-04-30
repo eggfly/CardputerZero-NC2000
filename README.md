@@ -111,21 +111,22 @@ NC2000 原生 LCD 是 160×80 + 左 21px / 右 7px 图标条。上游默认 `pix
 
 ```
 CardputerZero-NC2000/
-├── *.cpp *.h          # NC2000 上游模拟器源码
-├── ansi/ compare/ dsp/ lcdstripe/ misc/ test/  # 上游子目录
-├── resource/          # LCD 侧边图标素材（上游）
-├── roms/              # NC2000 3.5 ROM（nand/nand0/nor）
-├── port_fb/           # 上游的 framebuffer-only port（未用）
-├── cardputer/
-│   ├── nc2000-launch.sh   # CardputerZero 启动脚本
-│   └── nc2000.desktop     # APPLauncher 集成
+├── src/                  # wangyu-/NC2000 上游源码
+│   ├── *.cpp *.h
+│   └── ansi/ compare/ dsp/ lcdstripe/ misc/ test/
+├── port_fb/              # framebuffer port（nc2000_fb，设备上实际运行）
+├── resource/             # LCD 侧边图标素材
+├── roms/                 # NC2000 3.5 ROM（nand/nand0/nor）
+├── cardputer/            # CardputerZero 适配
+│   ├── nc2000-launch.sh
+│   └── nc2000.desktop    # APPLauncher 集成
 ├── packaging/
-│   ├── build_deb.sh       # 构建 .deb
+│   ├── build_deb.sh      # 构建 .deb
 │   ├── nc2000_icon.png
 │   └── VERSION
-├── CMakeLists.txt
+├── CMakeLists.txt        # 顶层 CMake（nc2000 + nc2000_fb）
 └── .github/workflows/
-    └── build-deb.yml      # arm64 CI
+    └── build-deb.yml     # arm64 CI
 ```
 
 ## 相关项目

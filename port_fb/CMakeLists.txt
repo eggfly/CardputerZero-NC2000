@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_FLAGS "-O3 -g -pthread -DHANDYPSP -Wno-deprecated-declarations")
 
 # NC2000 source root
-set(NC2K_SRC ${CMAKE_CURRENT_SOURCE_DIR}/..)
+set(NC2K_SRC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
 # Our stub headers MUST come first so fake SDL.h / lcdpainter.h are found
 # before the real ones in NC2K_SRC
