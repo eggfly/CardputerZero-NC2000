@@ -42,4 +42,9 @@ inline void SDL_LockAudioDevice(SDL_AudioDeviceID d) {}
 inline void SDL_UnlockAudioDevice(SDL_AudioDeviceID d) {}
 inline void SDL_memset(void *p, int v, int n) { memset(p, v, n); }
 
+// Window stubs: key_new.cpp touches SDL_SetWindowTitle on the fast-forward /
+// pro-key toggles. We have no SDL window here — silently swallow.
+struct SDL_Window;
+inline void SDL_SetWindowTitle(SDL_Window *, const char *) {}
+
 #endif
