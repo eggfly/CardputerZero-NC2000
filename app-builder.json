@@ -1,0 +1,16 @@
+{
+  "package_name": "nc2000",
+  "version": "0.1",
+  "app_name": "NC2000",
+  "bin_name": "nc2000",
+  "description": "Wenquxing NC2000 emulator — LVGL port loaded via cz_app.h",
+  "runtime": "lvgl-dlopen",
+  "lvgl_version": "9.5",
+  "caps": ["keyboard", "audio"],
+  "cmake_args": [
+    "-DENABLE_PORT_LVGL=ON",
+    "-DCZ_SDK_DIR=${CZ_SDK_DIR}",
+    "-DCZ_LVGL_DIR=${CZ_LVGL_DIR}"
+  ],
+  "cmake_target": "nc2000_lvgl"
+}
