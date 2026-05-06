@@ -19,6 +19,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <unistd.h>
 
 /* Upstream NC2000 core symbols (C++ headers). */
 #include "comm.h"
@@ -149,9 +150,20 @@ extern "C" CZ_APP_EXPORT void app_main(lv_obj_t *parent)
     lv_obj_set_style_text_color(label, lv_color_hex(0x00E5FF), 0);
     lv_obj_align(label, LV_ALIGN_BOTTOM_MID, 0, -2);
 
-    /* Upstream init. LoadNC2k() reads ROM/NAND/NOR from files whose paths are
-     * set via process_args; without them, defaults are used and the core
-     * still runs (just with empty storage). */
+    /* Upstream init. The core needs ROM/NAND/NOR file paths — settings.cpp
+     * defaults to "roms/<model>.*" relative to CWD. On desktop the emulator
+     * is launched from AppBuilder/emulator/build/ which doesn't have ROMs;
+     * give it a hand by chdir'ing to NC2000_ROM_DIR if provided. Device
+     * installs (/usr/share/nc2000) follow a separate codepath in port_fb
+     * and are unaffected. */
+    const char *rom_dir = getenv("NC2000_ROM_DIR");
+    if (rom_dir && rom_dir[0]) {
+        if (chdir(rom_dir) != 0) {
+            printf("[nc2000-lvgl] chdir(%s) failed; ROM files may not load\n", rom_dir);
+        } else {
+            printf("[nc2000-lvgl] cwd → %s\n", rom_dir);
+        }
+    }
     init_parameters();
     LoadNC2k();
 
