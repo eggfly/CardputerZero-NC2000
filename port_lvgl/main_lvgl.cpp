@@ -31,6 +31,8 @@
 extern nc2k_states_t nc2k_states;
 extern uint32_t SLICE_INTERVAL;
 extern uint32_t LCD_OUTER_REFRESH_INTERVAL;
+extern bool nc2000mode;
+extern WqxRom nc2k_rom;
 
 /* Upstream globals port_fb provided (we take over their role). */
 uint8_t lcd_buf[SCREEN_WIDTH * SCREEN_HEIGHT / 8 * 2];
@@ -164,6 +166,16 @@ extern "C" CZ_APP_EXPORT void app_main(lv_obj_t *parent)
             printf("[nc2000-lvgl] cwd → %s\n", rom_dir);
         }
     }
+
+    /* Upstream's process_args() is what normally sets rom paths. We don't
+     * parse argv here — set nc2000 mode + ROM paths directly so LoadNC2k()
+     * finds them. Device installs use a launcher script that chdirs to
+     * /usr/share/nc2000/ where the same filenames live. */
+    nc2000mode = true;
+    nc2k_rom.nandFlashPath = "roms/nc2000.nand";
+    nc2k_rom.nand0Path     = "roms/nc2000.nand0";
+    nc2k_rom.norFlashPath  = "roms/nc2000.nor";
+
     init_parameters();
     LoadNC2k();
 
