@@ -8,18 +8,19 @@
  *   - app_main(parent): allocate an lv_canvas sized at the scaled WQX display,
  *     spin up an LVGL timer that advances the NC2000 CPU + copies its lcd_buf
  *     into the canvas pixels.
- *   - We reuse the existing NC2K_CORE (cpu, memory, io, ROM loader) but not
- *     port_fb — that one writes to /dev/fb0 directly which we don't want.
- *
- * v0 scope: graphics only, no keyboard input wiring. That can be layered on
- * by grabbing lv_indev keypad events in the timer callback.
+ *   - Keyboard: the host emulator hands us every SDL keyboard event through
+ *     lv_sdl_keyboard_handler. We translate them to NC2000's 8×8 key matrix
+ *     via handle_key_wayback (the same path the SDL variant uses).
  */
 #include <cz_app.h>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <unistd.h>
+
+#include <SDL2/SDL.h>   /* stub in port_fb/SDL2/ — provides SDLK_* enums */
 
 /* Upstream NC2000 core symbols (C++ headers). */
 #include "comm.h"
@@ -27,6 +28,7 @@
 #include "state.h"
 #include "display.h"
 #include "settings.h"
+#include "key_new.h"
 
 extern nc2k_states_t nc2k_states;
 extern uint32_t SLICE_INTERVAL;
@@ -38,6 +40,12 @@ extern WqxRom nc2k_rom;
 uint8_t lcd_buf[SCREEN_WIDTH * SCREEN_HEIGHT / 8 * 2];
 unsigned char *lcd_effect_buffer = nullptr;
 void init_lcd_stripe() { /* stub — no LCD stripe decoration in LVGL mode */ }
+
+/* key_new.cpp references `extern SDL_Window *window` when the user toggles
+ * fast-forward / pro-key (to update the window title). We have no SDL window
+ * here; define the symbol to satisfy the linker — SDL_SetWindowTitle is a
+ * no-op in the stubbed SDL.h. */
+SDL_Window *window = nullptr;
 
 /* ----- Palette ----- */
 static const uint16_t palette_rgb565[4] = {
@@ -58,7 +66,22 @@ static const int DISP_H = WQX_H * SCALE; /* 160 */
 static lv_obj_t  *g_canvas = NULL;
 static uint16_t  *g_cbuf   = NULL;  /* WQX scaled buffer, RGB565 */
 static lv_timer_t *g_timer = NULL;
-static uint64_t   g_tick_ms = 0;
+static uint64_t   g_last_ns = 0;    /* CLOCK_MONOTONIC_RAW ns at previous slice */
+
+/* Real wall-clock time in nanoseconds. We can't use lv_tick_get() here — the
+ * host calls lv_tick_inc(5) per render loop, but vsync stretches each loop to
+ * ~16ms on a 60Hz display, so LVGL's internal clock runs ~3x slower than the
+ * wall. Using it to drive RunTimeSlice throttled the 5.12MHz NC2000 CPU down
+ * to ~1.5MHz — the "slower than CM0" symptom. */
+static inline uint64_t mono_ns() {
+    struct timespec ts;
+#if defined(CLOCK_MONOTONIC_RAW)
+    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+#else
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+#endif
+    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+}
 
 static void write_scaled_pixels(uint8_t *lcd)
 {
@@ -104,15 +127,25 @@ static void write_scaled_pixels(uint8_t *lcd)
 static void nc2k_tick_cb(lv_timer_t *t)
 {
     (void)t;
-    /* Advance emulation one slice. RunTimeSlice takes a uint32_t ms amount. */
-    RunTimeSlice(SLICE_INTERVAL, false);
-    g_tick_ms += SLICE_INTERVAL;
+    /* Advance the CPU by *real* wall-clock elapsed time. Cap at 50ms so a
+     * paused window / backgrounded tab doesn't flood us with emulation work
+     * the moment we resume. */
+    uint64_t now_ns = mono_ns();
+    uint64_t elapsed_ns = now_ns - g_last_ns;
+    g_last_ns = now_ns;
+    if (elapsed_ns == 0) return;
+    uint32_t elapsed_ms = (uint32_t)(elapsed_ns / 1000000ULL);
+    if (elapsed_ms == 0) elapsed_ms = 1;
+    if (elapsed_ms > 50) elapsed_ms = 50;
+    RunTimeSlice(elapsed_ms, false);
 
-    /* Throttle screen refresh via the upstream LCD_OUTER_REFRESH_INTERVAL. */
-    static uint64_t last_render = 0;
-    if (g_tick_ms / LCD_OUTER_REFRESH_INTERVAL == last_render / LCD_OUTER_REFRESH_INTERVAL)
+    /* Throttle screen refresh via the upstream LCD_OUTER_REFRESH_INTERVAL.
+     * Use ms-wall-clock, not lv_tick, for the same reason as the slice above. */
+    static uint64_t last_render_ms = 0;
+    uint64_t now_ms = now_ns / 1000000ULL;
+    if (now_ms / LCD_OUTER_REFRESH_INTERVAL == last_render_ms / LCD_OUTER_REFRESH_INTERVAL)
         return;
-    last_render = g_tick_ms;
+    last_render_ms = now_ms;
 
     /* Check LCD on/off. */
     bool lcd_on = true;
@@ -177,9 +210,17 @@ extern "C" CZ_APP_EXPORT void app_main(lv_obj_t *parent)
     nc2k_rom.norFlashPath  = "roms/nc2000.nor";
 
     init_parameters();
+    init_keyitems();         /* builds sdl_to_item map used by handle_key_wayback */
     LoadNC2k();
 
-    g_timer = lv_timer_create(nc2k_tick_cb, SLICE_INTERVAL, NULL);
+    g_last_ns = mono_ns();
+    /* Fire the tick cb as fast as LVGL will let us (1ms). The callback itself
+     * computes real-elapsed time so the CPU stays in step with wall clock
+     * regardless of the host's LVGL period. In practice the host's render
+     * vsync pins this to ~16ms/frame, which means we hand the CPU ~16ms of
+     * work (≈82k cycles at 5.12MHz) per slice — comfortably under the CM0
+     * per-slice budget. */
+    g_timer = lv_timer_create(nc2k_tick_cb, 1, NULL);
 
     printf("[nc2000-lvgl] app_main running (canvas %dx%d)\n", DISP_W, DISP_H);
 }
@@ -199,18 +240,68 @@ extern "C" CZ_APP_EXPORT void app_event(int type, void *data)
  * will prefer it. */
 extern "C" CZ_APP_EXPORT void ui_init(void) { app_main(lv_screen_active()); }
 
-/* The emulator also looks for lv_sdl_keyboard_create / _handler. Without them
- * it creates a keypad indev with no read_cb → LVGL log spam. Provide a
- * minimal indev with a no-op read_cb until real keypad support lands. */
+/* ============================================================
+ * Host keyboard hooks
+ *
+ * The emulator's main.cpp hands us every SDL_KEYDOWN / SDL_KEYUP / SDL_TEXTINPUT
+ * event through g_kbd_handler (the symbol `lv_sdl_keyboard_handler` we export
+ * below). We dispatch KEYDOWN/KEYUP into the NC2000 core's handle_key_wayback,
+ * which writes the 8×8 keypadmatrix the emulated CPU scans in io_new.cpp /
+ * NekoDriverIO.cpp.
+ *
+ * We still also create a dummy LVGL keypad indev so the LVGL side of things
+ * doesn't warn about a missing read_cb.
+ * ============================================================ */
+
+/* We intentionally don't pull in real <SDL2/SDL.h> (the build's include path
+ * is wired up to resolve it to the port_fb stub, which has no SDL_Event
+ * layout). We only need two things from the event pointer the host passes us:
+ *   - the event type  (Uint32 at offset 0)
+ *   - .key.keysym.sym (SDL_Keycode == Sint32 at offset 20 of SDL_Event)
+ * Those offsets are stable across SDL2 2.0.x.
+ *   SDL_Event union → SDL_KeyboardEvent key
+ *     offset  0  Uint32 type
+ *     offset  4  Uint32 timestamp
+ *     offset  8  Uint32 windowID
+ *     offset 12  Uint8  state
+ *     offset 13  Uint8  repeat
+ *     offset 14  Uint8  padding2
+ *     offset 15  Uint8  padding3
+ *     offset 16  SDL_Keysym keysym
+ *       offset 16  SDL_Scancode scancode   (enum → 4 bytes)
+ *       offset 20  SDL_Keycode  sym        (Sint32)
+ */
+enum {
+    SDL_KEYDOWN_VAL = 0x300,
+    SDL_KEYUP_VAL   = 0x301,
+};
+
 static void _nc2k_kbd_read(lv_indev_t *indev, lv_indev_data_t *data) {
     (void)indev;
     data->state = LV_INDEV_STATE_RELEASED;
     data->key = 0;
 }
+
 extern "C" CZ_APP_EXPORT lv_indev_t *lv_sdl_keyboard_create(void) {
     lv_indev_t *kb = lv_indev_create();
     lv_indev_set_type(kb, LV_INDEV_TYPE_KEYPAD);
     lv_indev_set_read_cb(kb, _nc2k_kbd_read);
     return kb;
 }
-extern "C" CZ_APP_EXPORT void lv_sdl_keyboard_handler(void *ev) { (void)ev; }
+
+extern "C" CZ_APP_EXPORT void lv_sdl_keyboard_handler(void *ev) {
+    if (!ev) return;
+    const uint8_t *bytes = (const uint8_t *)ev;
+    uint32_t type;
+    int32_t  sym;
+    memcpy(&type, bytes + 0,  sizeof(type));
+    memcpy(&sym,  bytes + 20, sizeof(sym));
+    if (type == SDL_KEYDOWN_VAL) {
+        handle_key_wayback((signed int)sym, true);
+    } else if (type == SDL_KEYUP_VAL) {
+        handle_key_wayback((signed int)sym, false);
+    }
+    /* SDL_TEXTINPUT is ignored — NC2000 samples the raw matrix from keycode
+     * presses, and the character-input path (input_text) is only useful for
+     * the debug console which isn't wired up in LVGL. */
+}

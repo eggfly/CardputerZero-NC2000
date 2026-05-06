@@ -125,8 +125,11 @@ if(ENABLE_PORT_LVGL)
     endif()
     set(NC2K_LVGL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/port_lvgl)
     # Reuse stub headers from port_fb (SDL.h shim, lcdpainter_stub.h).
+    # key_new.cpp lives in core but wasn't part of NC2K_CORE; it provides
+    # the handle_key_wayback / init_keyitems we dispatch host SDL events into.
     set(NC2K_LVGL_SOURCES
         ${NC2K_LVGL_DIR}/main_lvgl.cpp
+        ${NC2K_SRC_DIR}/key_new.cpp
         ${NC2K_SRC_DIR}/sound.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/port_fb/sound_stub.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/port_fb/console_stub.cpp
