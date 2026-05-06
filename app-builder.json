@@ -12,5 +12,8 @@
     "-DCZ_SDK_DIR=${CZ_SDK_DIR}",
     "-DCZ_LVGL_DIR=${CZ_LVGL_DIR}"
   ],
-  "cmake_target": "nc2000_lvgl"
+  "cmake_target": "nc2000_lvgl",
+  "env": {
+    "NC2000_ROM_DIR": "${APP_DIR}"
+  }
 }
